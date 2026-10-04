@@ -1,0 +1,232 @@
+{
+  "schema_version": 2,
+  "git_sha": "2d686880b94b",
+  "card_data_hash": "56b033662b27ea926a2db73a8b83007b6352ff35",
+  "unix_timestamp_secs": 1785243991,
+  "difficulty": "Medium",
+  "games_per_matchup": 10,
+  "base_seed": 10573729,
+  "results": [
+    {
+      "matchup_id": "red-mirror",
+      "exercises": [
+        "AggroPressure"
+      ],
+      "p0_label": "Red Aggro (P0)",
+      "p1_label": "Red Aggro (P1)",
+      "expected": {
+        "kind": "Mirror",
+        "tolerance": 0.15
+      },
+      "p0_wins": 4,
+      "p1_wins": 6,
+      "draws": 0,
+      "games": [
+        {
+          "seed": 10579729,
+          "winner": 1,
+          "turns": 20
+        },
+        {
+          "seed": 10579730,
+          "winner": 1,
+          "turns": 10
+        },
+        {
+          "seed": 10579731,
+          "winner": 1,
+          "turns": 16
+        },
+        {
+          "seed": 10579732,
+          "winner": 0,
+          "turns": 14
+        },
+        {
+          "seed": 10579733,
+          "winner": 1,
+          "turns": 11
+        },
+        {
+          "seed": 10579734,
+          "winner": 0,
+          "turns": 10
+        },
+        {
+          "seed": 10579735,
+          "winner": 1,
+          "turns": 15
+        },
+        {
+          "seed": 10579736,
+          "winner": 0,
+          "turns": 10
+        },
+        {
+          "seed": 10579737,
+          "winner": 0,
+          "turns": 17
+        },
+        {
+          "seed": 10579738,
+          "winner": 1,
+          "turns": 16
+        }
+      ],
+      "total_turns": 139,
+      "total_duration_ms": 68288,
+      "avg_turns": 13.9,
+      "avg_duration_ms": 6828.8,
+      "status": "Pass",
+      "fail_reason": null
+    },
+    {
+      "matchup_id": "affinity-mirror",
+      "exercises": [
+        "Artifacts",
+        "PlusOneCounters",
+        "AggroPressure"
+      ],
+      "p0_label": "Affinity (P0)",
+      "p1_label": "Affinity (P1)",
+      "expected": {
+        "kind": "Mirror",
+        "tolerance": 0.15
+      },
+      "p0_wins": 4,
+      "p1_wins": 4,
+      "draws": 2,
+      "games": [
+        {
+          "seed": 10592729,
+          "winner": 1,
+          "turns": 15
+        },
+        {
+          "seed": 10592730,
+          "winner": 1,
+          "turns": 12
+        },
+        {
+          "seed": 10592731,
+          "winner": 1,
+          "turns": 9
+        },
+        {
+          "seed": 10592732,
+          "winner": 0,
+          "turns": 12
+        },
+        {
+          "seed": 10592733,
+          "winner": 0,
+          "turns": 14
+        },
+        {
+          "seed": 10592734,
+          "winner": 0,
+          "turns": 13
+        },
+        {
+          "seed": 10592735,
+          "winner": null,
+          "turns": 8
+        },
+        {
+          "seed": 10592736,
+          "winner": null,
+          "turns": 8
+        },
+        {
+          "seed": 10592737,
+          "winner": 1,
+          "turns": 11
+        },
+        {
+          "seed": 10592738,
+          "winner": 0,
+          "turns": 12
+        }
+      ],
+      "total_turns": 114,
+      "total_duration_ms": 127476,
+      "avg_turns": 11.4,
+      "avg_duration_ms": 12747.6,
+      "status": "Pass",
+      "fail_reason": null
+    },
+    {
+      "matchup_id": "enchantress-mirror",
+      "exercises": [
+        "Enchantments"
+      ],
+      "p0_label": "Selesnya Enchantress (P0)",
+      "p1_label": "Selesnya Enchantress (P1)",
+      "expected": {
+        "kind": "Mirror",
+        "tolerance": 0.15
+      },
+      "p0_wins": 4,
+      "p1_wins": 6,
+      "draws": 0,
+      "games": [
+        {
+          "seed": 10593729,
+          "winner": 1,
+          "turns": 10
+        },
+        {
+          "seed": 10593730,
+          "winner": 0,
+          "turns": 18
+        },
+        {
+          "seed": 10593731,
+          "winner": 1,
+          "turns": 12
+        },
+        {
+          "seed": 10593732,
+          "winner": 1,
+          "turns": 14
+        },
+        {
+          "seed": 10593733,
+          "winner": 1,
+          "turns": 11
+        },
+        {
+          "seed": 10593734,
+          "winner": 0,
+          "turns": 15
+        },
+        {
+          "seed": 10593735,
+          "winner": 0,
+          "turns": 15
+        },
+        {
+          "seed": 10593736,
+          "winner": 0,
+          "turns": 14
+        },
+        {
+          "seed": 10593737,
+          "winner": 1,
+          "turns": 18
+        },
+        {
+          "seed": 10593738,
+          "winner": 1,
+          "turns": 19
+        }
+      ],
+      "total_turns": 146,
+      "total_duration_ms": 252988,
+      "avg_turns": 14.6,
+      "avg_duration_ms": 25298.8,
+      "status": "Pass",
+      "fail_reason": null
+    }
+  ]
+}
