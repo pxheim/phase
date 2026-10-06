@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -352,7 +352,7 @@ pub struct EventObjectSnapshot {
     pub mana_value: u32,
     /// CR 122.1: counters on the subject as of capture.
     #[serde(with = "crate::types::counter::counter_map_serde")]
-    pub counters: HashMap<CounterType, u32>,
+    pub counters: BTreeMap<CounterType, u32>,
 
     pub is_token: bool,
     pub is_commander: bool,

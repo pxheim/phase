@@ -3,7 +3,7 @@
 //! Replaces the Forge-style string filter parsing with typed enum matching.
 //! All filter logic works against the TargetFilter enum hierarchy from types/ability.rs.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::game::combat;
 use crate::game::game_object::GameObject;
@@ -6560,7 +6560,7 @@ fn source_context_from_filter<'a>(
                     keywords: Vec::new(),
                     colors: Vec::new(),
                     chosen_attributes: Vec::new(),
-                    counters: HashMap::new(),
+                    counters: BTreeMap::new(),
                     tapped: false,
                     is_suspected: false,
                     attachments: Vec::new(),
@@ -8822,7 +8822,7 @@ fn source_context_from_spell_filter(context: SpellFilterContext<'_>) -> SourceCo
             keywords: Vec::new(),
             colors: Vec::new(),
             chosen_attributes: Vec::new(),
-            counters: HashMap::new(),
+            counters: BTreeMap::new(),
             tapped: false,
             is_suspected: false,
             attachments: Vec::new(),
@@ -17561,7 +17561,6 @@ mod tests {
     fn parent_target_shares_quality_resolves_via_effect_context_snapshot() {
         use crate::types::ability::{CostPaidObjectSnapshot, SharedQuality, SharedQualityRelation};
         use crate::types::game_state::LKISnapshot;
-        use std::collections::HashMap;
 
         let creature_lki = LKISnapshot {
             name: "Test Creature".to_string(),
@@ -17579,7 +17578,7 @@ mod tests {
             keywords: vec![],
             colors: vec![],
             chosen_attributes: Vec::new(),
-            counters: HashMap::new(),
+            counters: BTreeMap::new(),
             tapped: false,
             is_suspected: false,
             attachments: Vec::new(),
@@ -17600,7 +17599,7 @@ mod tests {
             keywords: vec![],
             colors: vec![],
             chosen_attributes: Vec::new(),
-            counters: HashMap::new(),
+            counters: BTreeMap::new(),
             tapped: false,
             is_suspected: false,
             attachments: Vec::new(),

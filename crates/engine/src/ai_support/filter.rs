@@ -29,7 +29,7 @@
 //! ("resolve_trigger", "apply_damage") here is out of scope; this is a
 //! structural legality pipeline, not a rules engine.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
@@ -560,7 +560,7 @@ struct ObjectFingerprint {
     mana_cost: ManaCost,
     cost_x_paid: Option<u32>,
     zone: Zone,
-    counters: HashMap<CounterType, u32>,
+    counters: BTreeMap<CounterType, u32>,
     power: Option<i32>,
     toughness: Option<i32>,
     base_power: Option<i32>,

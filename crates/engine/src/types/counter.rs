@@ -1,10 +1,10 @@
 use crate::types::keywords::KeywordKind;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Counter types serialize as flat strings so they can be used as JSON map keys
-/// in `HashMap<CounterType, u32>`. Without this, `Generic("quest")` would serialize
+/// in `BTreeMap<CounterType, u32>`. Without this, `Generic("quest")` would serialize
 /// as `{"Generic":"quest"}` which serde_json rejects as a map key.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CounterType {
@@ -215,8 +215,8 @@ pub(crate) mod counter_map_serde {
     use serde::{Deserializer, Serializer};
     use std::fmt;
 
-    pub(crate) fn serialize<S, H>(
-        map: &HashMap<CounterType, u32, H>,
+    pub(crate) fn serialize<S>(
+        map: &BTreeMap<CounterType, u32>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>
     where
@@ -231,14 +231,14 @@ pub(crate) mod counter_map_serde {
 
     pub(crate) fn deserialize<'de, D>(
         deserializer: D,
-    ) -> Result<HashMap<CounterType, u32>, D::Error>
+    ) -> Result<BTreeMap<CounterType, u32>, D::Error>
     where
         D: Deserializer<'de>,
     {
         struct CounterMapVisitor;
 
         impl<'de> Visitor<'de> for CounterMapVisitor {
-            type Value = HashMap<CounterType, u32>;
+            type Value = BTreeMap<CounterType, u32>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("a map of counter type keys to counts")
@@ -248,7 +248,7 @@ pub(crate) mod counter_map_serde {
             where
                 M: MapAccess<'de>,
             {
-                let mut map = HashMap::new();
+                let mut map = BTreeMap::new();
                 while let Some((counter_type, count)) = access.next_entry::<CounterType, u32>()? {
                     let total = map.entry(counter_type).or_insert(0_u32);
                     let next = (*total)
@@ -404,13 +404,13 @@ fn format_counter_delta(value: i32, paired_value: i32) -> String {
 /// CR 122.1: A counter is a marker on an object or player; an internal map
 /// entry with count zero is not a marker and must not satisfy "has a counter"
 /// checks (e.g. proliferate CR 701.34a).
-pub fn has_positive_counters(counters: &HashMap<CounterType, u32>) -> bool {
+pub fn has_positive_counters(counters: &BTreeMap<CounterType, u32>) -> bool {
     counters.values().any(|&count| count > 0)
 }
 
 /// Counter entries currently present on an object or LKI snapshot (count > 0 only).
 pub fn positive_counter_entries(
-    counters: &HashMap<CounterType, u32>,
+    counters: &BTreeMap<CounterType, u32>,
 ) -> impl Iterator<Item = (&CounterType, u32)> {
     counters
         .iter()
@@ -418,7 +418,7 @@ pub fn positive_counter_entries(
 }
 
 /// Counter types currently present on an object or LKI snapshot (count > 0 only).
-pub fn positive_counter_types(counters: &HashMap<CounterType, u32>) -> Vec<CounterType> {
+pub fn positive_counter_types(counters: &BTreeMap<CounterType, u32>) -> Vec<CounterType> {
     positive_counter_entries(counters)
         .map(|(counter_type, _)| counter_type.clone())
         .collect()
@@ -426,7 +426,7 @@ pub fn positive_counter_types(counters: &HashMap<CounterType, u32>) -> Vec<Count
 
 /// CR 122.1: Drop zero-count entries so counter presence stays aligned with
 /// actual markers and downstream eligibility checks.
-pub fn prune_zero_counters(counters: &mut HashMap<CounterType, u32>) {
+pub fn prune_zero_counters(counters: &mut BTreeMap<CounterType, u32>) {
     counters.retain(|_, count| *count > 0);
 }
 
@@ -436,44 +436,25 @@ mod tests {
         counter_map_serde, has_positive_counters, parse_counter_type, positive_counter_entries,
         positive_counter_types, prune_zero_counters, try_parse_counter_type, CounterType,
     };
-    use crate::types::deterministic_serde::test_support::ReverseBuildHasher;
     use serde::{Deserialize, Serialize};
-    use std::collections::HashMap;
-
-    #[derive(Serialize)]
-    struct AdversarialCounterMapFixture<'a> {
-        #[serde(serialize_with = "counter_map_serde::serialize")]
-        counters: &'a HashMap<CounterType, u32, ReverseBuildHasher>,
-    }
+    use std::collections::BTreeMap;
 
     #[derive(Debug, Deserialize, Serialize)]
     struct CounterMapFixture {
         #[serde(with = "counter_map_serde")]
-        counters: HashMap<CounterType, u32>,
+        counters: BTreeMap<CounterType, u32>,
     }
 
     #[test]
     fn counter_map_serializer_sorts_typed_keys_without_changing_its_object_shape() {
-        let counters = HashMap::with_hasher(ReverseBuildHasher);
-        let mut counters = counters;
+        let mut counters = BTreeMap::new();
         counters.insert(CounterType::Loyalty, 3);
         counters.insert(CounterType::Minus1Minus1, 2);
         counters.insert(CounterType::Plus1Plus1, 1);
 
         assert_eq!(
-            counters.keys().cloned().collect::<Vec<_>>(),
-            vec![
-                CounterType::Loyalty,
-                CounterType::Minus1Minus1,
-                CounterType::Plus1Plus1,
-            ],
-            "hostile hasher must expose descending native iteration"
-        );
-        assert_eq!(
-            serde_json::to_string(&AdversarialCounterMapFixture {
-                counters: &counters
-            })
-            .expect("counter fixture should serialize"),
+            serde_json::to_string(&CounterMapFixture { counters })
+                .expect("counter fixture should serialize"),
             r#"{"counters":{"P1P1":1,"M1M1":2,"loyalty":3}}"#
         );
 
@@ -636,7 +617,7 @@ mod tests {
 
     #[test]
     fn has_positive_counters_ignores_zero_entries() {
-        let mut counters = HashMap::new();
+        let mut counters = BTreeMap::new();
         counters.insert(CounterType::Plus1Plus1, 0);
         assert!(!has_positive_counters(&counters));
         counters.insert(CounterType::Lore, 1);
@@ -645,7 +626,7 @@ mod tests {
 
     #[test]
     fn positive_counter_types_skips_zero_entries() {
-        let mut counters = HashMap::new();
+        let mut counters = BTreeMap::new();
         counters.insert(CounterType::Plus1Plus1, 0);
         counters.insert(CounterType::Generic("charge".to_string()), 2);
         assert_eq!(
@@ -656,7 +637,7 @@ mod tests {
 
     #[test]
     fn positive_counter_entries_skips_zero_entries() {
-        let mut counters = HashMap::new();
+        let mut counters = BTreeMap::new();
         counters.insert(CounterType::Plus1Plus1, 0);
         counters.insert(CounterType::Generic("charge".to_string()), 2);
         assert_eq!(
@@ -669,11 +650,26 @@ mod tests {
 
     #[test]
     fn prune_zero_counters_drops_stale_keys() {
-        let mut counters = HashMap::new();
+        let mut counters = BTreeMap::new();
         counters.insert(CounterType::Plus1Plus1, 0);
         counters.insert(CounterType::Stun, 1);
         prune_zero_counters(&mut counters);
         assert!(!counters.contains_key(&CounterType::Plus1Plus1));
         assert_eq!(counters.get(&CounterType::Stun), Some(&1));
+    }
+
+    #[test]
+    fn counters_are_walked_in_counter_type_order_whatever_order_they_were_put_on() {
+        // CR 701.34a: proliferate, and moving counters, walk an object's
+        // counters in order. A std `HashMap` is ordered afresh in each
+        // process, so the same game could play differently from one run to
+        // the next; a `BTreeMap` walks them in `CounterType` order.
+        let mut counters = BTreeMap::new();
+        counters.insert(CounterType::Lore, 1);
+        counters.insert(CounterType::Plus1Plus1, 2);
+        assert_eq!(
+            positive_counter_types(&counters),
+            vec![CounterType::Plus1Plus1, CounterType::Lore]
+        );
     }
 }

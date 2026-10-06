@@ -3604,7 +3604,7 @@ fn resolve_proven_self_counter_batch(
 
 fn battlefield_counter_snapshot(
     state: &GameState,
-) -> Vec<(ObjectId, std::collections::HashMap<CounterType, u32>)> {
+) -> Vec<(ObjectId, std::collections::BTreeMap<CounterType, u32>)> {
     state
         .battlefield
         .iter()

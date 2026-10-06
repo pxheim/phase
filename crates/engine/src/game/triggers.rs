@@ -22249,7 +22249,7 @@ pub mod tests {
             "Countered Dead".to_string(),
             Zone::Graveyard,
         );
-        let mut counters = std::collections::HashMap::new();
+        let mut counters = std::collections::BTreeMap::new();
         counters.insert(crate::types::counter::CounterType::Plus1Plus1, 1);
         state.lki_cache.insert(
             dead,

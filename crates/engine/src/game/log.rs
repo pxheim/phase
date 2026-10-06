@@ -2242,7 +2242,7 @@ fn format_segments(event: &GameEvent, state: &GameState) -> Vec<LogSegment> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     use super::*;
     use crate::game::engine::{
@@ -2742,7 +2742,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![],
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),

@@ -22043,7 +22043,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![],
                 chosen_attributes: vec![ChosenAttribute::Player(PlayerId(1))],
-                counters: HashMap::new(),
+                counters: std::collections::BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),

@@ -4,7 +4,7 @@
 //! against the current game state at resolution time. Used by effect resolvers
 //! to support "for each [X]" patterns on Draw, DealDamage, GainLife, LoseLife, Mill.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::game::arithmetic::{u32_to_i32_saturating, usize_to_i32_saturating};
 use crate::game::filter::{
@@ -7202,7 +7202,7 @@ fn event_context_counter_count_from_lki(
 }
 
 pub(crate) fn counter_count_from_map(
-    counters: &HashMap<CounterType, u32>,
+    counters: &BTreeMap<CounterType, u32>,
     counter_type: Option<&CounterType>,
 ) -> i32 {
     match counter_type {
@@ -10132,7 +10132,7 @@ mod tests {
             keywords: vec![],
             colors: vec![],
             chosen_attributes: Vec::new(),
-            counters: HashMap::new(),
+            counters: BTreeMap::new(),
             tapped: false,
             is_suspected: false,
             attachments: Vec::new(),
@@ -19369,7 +19369,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![],
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),
@@ -19433,7 +19433,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![ManaColor::Green],
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),
@@ -19583,7 +19583,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![],
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),
@@ -19664,7 +19664,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![],
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),
@@ -19744,7 +19744,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![],
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),
@@ -19810,7 +19810,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![],
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),
@@ -19873,7 +19873,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![],
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),
@@ -19929,7 +19929,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![],
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),
@@ -20008,7 +20008,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![],
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),
@@ -20364,7 +20364,7 @@ mod tests {
                 keywords: vec![],
                 colors: vec![],
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),

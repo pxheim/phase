@@ -4721,13 +4721,13 @@ mod tests {
     #[test]
     fn snapshot_counters_on_source_in_change_zone_enter_with_counters() {
         use crate::types::game_state::LKISnapshot;
-        use std::collections::HashMap;
+        use std::collections::BTreeMap;
 
         let mut state = GameState::new_two_player(42);
         let source_id = ObjectId(7); // Nine-Lives Familiar that just died
 
         // Populate LKI cache as if the source died with 5 revival counters
-        let mut lki_counters = HashMap::new();
+        let mut lki_counters = BTreeMap::new();
         lki_counters.insert(CounterType::Generic("revival".to_string()), 5);
         state.lki_cache.insert(
             source_id,

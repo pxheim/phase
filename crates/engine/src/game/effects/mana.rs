@@ -864,6 +864,9 @@ fn resolve_mana_types_impl(
         // of one uniform color (basics → one type; Nykthos → all green), so
         // emitting one unit per *distinct* color yields exactly one mana — the
         // CR-correct "any type that land produced" with no choice to make.
+        // A land that taps for two types at once (a bounce land) yields one
+        // unit of each, in `ManaType` order: payment spends pool units by
+        // position, so a hash order would change the game from run to run.
         //
         // If a future card requires the player to *choose* among multiple
         // produced types in a single resolution ("any one type that land
@@ -878,7 +881,7 @@ fn resolve_mana_types_impl(
                     GameEvent::TappedForMana { produced, .. }
                     | GameEvent::ManaAbilityProduced { produced, .. },
                 ) => {
-                    let distinct: std::collections::HashSet<_> = produced.iter().copied().collect();
+                    let distinct: std::collections::BTreeSet<_> = produced.iter().copied().collect();
                     distinct.into_iter().collect()
                 }
                 _ => Vec::new(),

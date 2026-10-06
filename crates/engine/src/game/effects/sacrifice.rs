@@ -2143,7 +2143,7 @@ mod tests {
             keywords: vec![],
             colors: vec![],
             chosen_attributes: Vec::new(),
-            counters: std::collections::HashMap::new(),
+            counters: std::collections::BTreeMap::new(),
             tapped: false,
             is_suspected: false,
             attachments: Vec::new(),

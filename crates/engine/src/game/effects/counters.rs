@@ -6136,7 +6136,7 @@ mod tests {
         );
 
         // Populate LKI cache as if the source died with 3 +1/+1 counters
-        let mut lki_counters = std::collections::HashMap::new();
+        let mut lki_counters = std::collections::BTreeMap::new();
         lki_counters.insert(CounterType::Plus1Plus1, 3);
         state.lki_cache.insert(
             source_id,

@@ -9686,6 +9686,86 @@ fn taps_for_mana_multiplier_fires_once_on_color_choice_priority_resume() {
     );
 }
 
+/// CR 106.12a: a `TapsForMana` doubler copying a land that taps for two types
+/// at once ({W}{U}, a bounce land) adds its bonus mana in one order. Payment
+/// spends pool units by position, and the distinct types used to be collected
+/// through a std `HashSet`, whose order is seeded afresh per map, so the same
+/// game could spend a different color from one run to the next.
+#[test]
+fn taps_for_mana_bonus_from_a_two_type_land_lands_in_the_pool_in_one_order() {
+    for _ in 0..20 {
+        let mut state = setup_game_at_main_phase();
+        let doubler = create_object(
+            &mut state,
+            CardId(200),
+            PlayerId(0),
+            "Mana Doubler".to_string(),
+            Zone::Battlefield,
+        );
+        state
+            .objects
+            .get_mut(&doubler)
+            .unwrap()
+            .trigger_definitions
+            .push(
+                TriggerDefinition::new(TriggerMode::TapsForMana)
+                    .execute(AbilityDefinition::new(
+                        AbilityKind::Database,
+                        Effect::Mana {
+                            produced: ManaProduction::TriggerEventManaType,
+                            restrictions: vec![],
+                            grants: vec![],
+                            expiry: None,
+                            target: None,
+                        },
+                    ))
+                    .valid_card(TargetFilter::Any)
+                    .valid_target(TargetFilter::Controller),
+            );
+        let land = create_object(
+            &mut state,
+            CardId(201),
+            PlayerId(0),
+            "Azorius Chancery".to_string(),
+            Zone::Battlefield,
+        );
+        {
+            let obj = state.objects.get_mut(&land).unwrap();
+            obj.card_types.core_types.push(CoreType::Land);
+            obj.entered_battlefield_turn = Some(1);
+            Arc::make_mut(&mut obj.abilities).push(
+                AbilityDefinition::new(
+                    AbilityKind::Activated,
+                    Effect::Mana {
+                        produced: ManaProduction::Fixed {
+                            colors: vec![ManaColor::White, ManaColor::Blue],
+                            contribution: ManaContribution::Base,
+                        },
+                        restrictions: vec![],
+                        grants: vec![],
+                        expiry: None,
+                        target: None,
+                    },
+                )
+                .cost(AbilityCost::Tap),
+            );
+        }
+
+        apply_tap_land_as_current(&mut state, land).unwrap();
+
+        let pool: Vec<ManaType> = state.players[0]
+            .mana_pool
+            .mana
+            .iter()
+            .map(|unit| unit.color)
+            .collect();
+        assert_eq!(
+            pool,
+            [ManaType::White, ManaType::Blue, ManaType::White, ManaType::Blue]
+        );
+    }
+}
+
 /// Issue #443 companion: the same `TapsForMana` multiplier must also fire
 /// exactly once when the `AnyOneColor` ability is activated mid-payment
 /// (`ManaAbilityResume::ManaPayment`). For that resume the post-action

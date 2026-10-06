@@ -429,7 +429,7 @@ pub struct LKISnapshot {
     /// CR 400.7: Counters as they last existed on the object.
     /// Used by `TriggerCondition::HadCounters` for "if it had counters on it" patterns.
     #[serde(default, with = "counter_map_serde")]
-    pub counters: HashMap<CounterType, u32>,
+    pub counters: BTreeMap<CounterType, u32>,
     /// CR 110.5 + CR 110.5d: Tap status as it last existed on the battlefield.
     /// A permanent's tapped/untapped status is battlefield-only — once the object
     /// leaves a public zone it is neither tapped nor untapped, so a look-back rider
@@ -2367,7 +2367,7 @@ pub struct CounterAddedRecord {
     pub controller: PlayerId,
     pub owner: PlayerId,
     #[serde(default, with = "counter_map_serde")]
-    pub counters: HashMap<CounterType, u32>,
+    pub counters: BTreeMap<CounterType, u32>,
 }
 
 /// CR 607.2a + CR 406.6: Tracks the link between an exiling source and the exiled card.
@@ -35178,7 +35178,7 @@ mod tests {
                 keywords: Vec::new(),
                 colors: Vec::new(),
                 chosen_attributes: Vec::new(),
-                counters: HashMap::new(),
+                counters: BTreeMap::new(),
                 tapped: false,
                 is_suspected: false,
                 attachments: Vec::new(),

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -521,9 +521,12 @@ pub struct GameObject {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pair_controller: Option<PlayerId>,
 
-    // Counters
+    // Counters. Ordered by `CounterType`: the rules walk an object's counters
+    // in order (proliferate, moving counters), and a std `HashMap` is ordered
+    // afresh in each process, so the same game could play differently from
+    // one run to the next.
     #[serde(with = "counter_map_serde")]
-    pub counters: HashMap<CounterType, u32>,
+    pub counters: BTreeMap<CounterType, u32>,
 
     /// Alchemy Intensity — a per-card escalating value (digital-only, no CR
     /// entry). Initialized from the card's "Starting intensity N" at first
@@ -2597,7 +2600,7 @@ impl GameObject {
             protection_start_exempt_attachments: HashMap::new(),
             paired_with: None,
             pair_controller: None,
-            counters: HashMap::new(),
+            counters: BTreeMap::new(),
             intensity: 0,
             perpetual_mods: Vec::new(),
             name: name.clone(),
