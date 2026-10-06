@@ -14671,6 +14671,20 @@ fn resolve_chain_body(
             state.clause_minimum_snapshot = None;
             if let Some(mut after_scope) = after_scope {
                 bind_resolution_exile_batch_paths(&mut after_scope, &linked_batch);
+                // CR 608.2c: "Each player chooses <objects>. <Verb> them." The
+                // detached tail's `ParentTarget` anaphor names the objects the
+                // `TargetOnly` head chose — what an undetached sub inherits via
+                // `should_propagate_parent_targets`. Left empty, the anaphor
+                // falls through `targeting::resolved_targets` to the trigger's
+                // entering object or the source: Foreboding Steamboat exiled
+                // itself "until it leaves", returned as a new object (CR 400.7)
+                // and triggered again, forever.
+                if matches!(ability.effect, Effect::TargetOnly { .. })
+                    && effect_refs_parent_target(&after_scope.effect)
+                    && should_propagate_parent_targets(ability, &after_scope)
+                {
+                    after_scope.targets = ability.targets.clone();
+                }
                 resolve_ability_chain(state, &after_scope, events, depth + 1)?;
             }
         } else if after_scope_needs_linked_exile {
@@ -31927,6 +31941,66 @@ mod tests {
             state.players[1].hand.len(),
             1,
             "opponent should have drawn a card"
+        );
+    }
+
+    /// CR 608.2c + CR 610.3: Foreboding Steamboat's ETB exactly as the v0.95.0
+    /// card data ships it: `TargetOnly` under `player_scope: All`, then "Exile
+    /// them until ~ leaves the battlefield" as a `ParentTarget` `ChangeZone`.
+    /// The fan-out detaches the exile as its once-after tail; that tail must
+    /// exile the creature the head chose, never the Steamboat itself.
+    #[test]
+    fn player_scope_target_only_tail_exiles_the_chosen_object_not_the_host() {
+        let mut state = GameState::new_two_player(42);
+        let steamboat = create_object(
+            &mut state,
+            CardId(1),
+            PlayerId(0),
+            "Foreboding Steamboat".to_string(),
+            Zone::Battlefield,
+        );
+        let spybug = create_object(
+            &mut state,
+            CardId(2),
+            PlayerId(0),
+            "Dimir Spybug".to_string(),
+            Zone::Battlefield,
+        );
+        state
+            .objects
+            .get_mut(&spybug)
+            .unwrap()
+            .card_types
+            .core_types
+            .push(crate::types::card_type::CoreType::Creature);
+        let def: crate::types::ability::AbilityDefinition = serde_json::from_str(
+            r#"{"condition":null,"cost":null,"description":null,"duration":null,"effect":{"target":{"controller":"ScopedPlayer","properties":[{"type":"NonToken"}],"type":"Typed","type_filters":["Creature",{"Non":{"Subtype":"Vehicle"}}]},"type":"TargetOnly"},"forward_result":false,"kind":"Spell","optional":false,"optional_targeting":false,"player_scope":{"type":"All"},"sub_ability":{"condition":null,"cost":null,"description":null,"duration":"UntilHostLeavesPlay","effect":{"destination":"Exile","enter_tapped":false,"enter_transformed":false,"enters_attacking":false,"origin":null,"owner_library":false,"target":{"type":"ParentTarget"},"type":"ChangeZone"},"forward_result":false,"kind":"Spell","optional":false,"optional_targeting":false,"sub_ability":null,"sub_link":"SequentialSibling","target_prompt":null},"target_prompt":null}"#,
+        )
+        .expect("Foreboding Steamboat's ETB deserializes");
+        let ability = crate::game::ability_utils::build_resolved_from_def_with_targets(
+            &def,
+            steamboat,
+            PlayerId(0),
+            vec![TargetRef::Object(spybug)],
+        );
+
+        let mut events = Vec::new();
+        resolve_ability_chain(&mut state, &ability, &mut events, 0).unwrap();
+
+        assert_eq!(
+            state.objects[&steamboat].zone,
+            Zone::Battlefield,
+            "the Steamboat must not exile itself"
+        );
+        assert_eq!(state.objects[&spybug].zone, Zone::Exile);
+        assert!(
+            state.exile_links.iter().any(|link| link.exiled_id == spybug
+                && link.source_id == steamboat
+                && link.kind
+                    == crate::types::game_state::ExileLinkKind::UntilSourceLeaves {
+                        return_zone: Zone::Battlefield
+                    }),
+            "the chosen creature returns when the Steamboat leaves"
         );
     }
 
