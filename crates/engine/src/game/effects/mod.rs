@@ -2993,6 +2993,23 @@ fn try_materialize_reflexive_trigger_inner(
         }
     }
 
+    // CR 601.2c + CR 603.3d + CR 608.2c: a gate that is not "when you do" (a
+    // `QuantityCheck`: "If X is 10 or more, ...") is a conditional instruction of
+    // the resolving ability, not a new triggered ability (CR 603.12). Its targets,
+    // and those of every later instruction in its chain, were announced with the
+    // ability (`defers_conditional_target_selection` keeps them on the stack),
+    // possibly as zero targets for an "up to" / "any number of" slot. So it
+    // resolves inline with what was announced. Building slots here re-asked them:
+    // for a gated clause with no target of its own, the slots of the clause after
+    // it (Zaffai, Thunder Conductor; Kinetic Ooze), and for an announced zero, the
+    // clause's own. The re-ask went onto the stack as a new entry whose root kept
+    // the gate and still held no targets of its own, so its resolution re-asked
+    // again, without end. Only a clause whose targets are chosen at resolution
+    // still selects them here.
+    if !creates_reflexive_trigger && reflexive.target_choice_timing == TargetChoiceTiming::Stack {
+        return Ok(false);
+    }
+
     let target_slots = match crate::game::ability_utils::build_target_slots(state, reflexive) {
         Ok(slots) => slots,
         Err(_) if creates_reflexive_trigger => {
@@ -20954,6 +20971,111 @@ mod tests {
             panic!("expected random reflexive trigger on stack");
         };
         assert_eq!(ability.targets.len(), 1);
+    }
+
+    fn quantity_gate_true() -> AbilityCondition {
+        AbilityCondition::QuantityCheck {
+            lhs: QuantityExpr::Fixed { value: 1 },
+            comparator: Comparator::GE,
+            rhs: QuantityExpr::Fixed { value: 1 },
+        }
+    }
+
+    /// CR 601.2c + CR 603.3d + CR 608.2c: Kinetic Ooze / Zaffai, Thunder
+    /// Conductor shape. "[A]. If ..., [B]. If ..., [C to target creature]." The
+    /// third clause's target was announced with the ability. When the second
+    /// clause's gate holds, both clauses resolve inline with that target: no
+    /// target prompt, no new stack entry. Before the fix the second clause
+    /// re-asked the third clause's slot and pushed itself as a new stack entry
+    /// whose resolution re-asked again, without end.
+    #[test]
+    fn quantity_gated_clause_resolves_inline_with_the_next_clause_announced_target() {
+        let mut state = GameState::new_two_player(42);
+        state.waiting_for = WaitingFor::Priority {
+            player: PlayerId(0),
+        };
+        let creature = reflexive_test_creature(&mut state, PlayerId(0), "Announced");
+        let gain_one = || {
+            ResolvedAbility::new(
+                Effect::GainLife {
+                    amount: QuantityExpr::Fixed { value: 1 },
+                    player: TargetFilter::Controller,
+                },
+                vec![],
+                ObjectId(100),
+                PlayerId(0),
+            )
+        };
+        let mut third = ResolvedAbility::new(
+            Effect::PutCounter {
+                counter_type: CounterType::Plus1Plus1,
+                count: QuantityExpr::Fixed { value: 1 },
+                target: TargetFilter::Typed(TypedFilter::creature()),
+            },
+            vec![TargetRef::Object(creature)],
+            ObjectId(100),
+            PlayerId(0),
+        )
+        .condition(quantity_gate_true());
+        third.sub_link = SubAbilityLink::SequentialSibling;
+        let mut second = gain_one().condition(quantity_gate_true()).sub_ability(third);
+        second.sub_link = SubAbilityLink::SequentialSibling;
+        let root = gain_one().sub_ability(second);
+        let life_before = state.players[0].life;
+        let mut events = Vec::new();
+
+        resolve_ability_chain(&mut state, &root, &mut events, 0).unwrap();
+
+        assert!(
+            matches!(state.waiting_for, WaitingFor::Priority { .. }),
+            "no target prompt at resolution, got {:?}",
+            state.waiting_for
+        );
+        assert!(state.stack.is_empty(), "no new stack entry");
+        assert!(state.pending_trigger.is_none());
+        assert_eq!(state.players[0].life, life_before + 2);
+        assert_eq!(
+            state.objects[&creature]
+                .counters
+                .get(&CounterType::Plus1Plus1)
+                .copied(),
+            Some(1),
+            "the third clause uses the target announced with the ability"
+        );
+    }
+
+    /// CR 601.2c + CR 603.3d: "any number of target creatures" announced as
+    /// zero stays zero. A gated clause holding no targets does not ask again at
+    /// resolution, so answering with no targets can't loop.
+    #[test]
+    fn quantity_gated_clause_with_announced_zero_targets_does_not_ask_again() {
+        let mut state = GameState::new_two_player(42);
+        state.waiting_for = WaitingFor::Priority {
+            player: PlayerId(0),
+        };
+        reflexive_test_creature(&mut state, PlayerId(0), "Legal but not chosen");
+        let mut clause = ResolvedAbility::new(
+            Effect::PutCounter {
+                counter_type: CounterType::Plus1Plus1,
+                count: QuantityExpr::Fixed { value: 1 },
+                target: TargetFilter::Typed(TypedFilter::creature()),
+            },
+            vec![],
+            ObjectId(100),
+            PlayerId(0),
+        )
+        .condition(quantity_gate_true());
+        clause.multi_target = Some(crate::types::ability::MultiTargetSpec::unlimited(0));
+        let mut events = Vec::new();
+
+        let materialized =
+            try_materialize_reflexive_trigger(&mut state, &clause, None, None, &mut events, 0)
+                .unwrap();
+
+        assert!(!materialized, "the clause resolves inline");
+        assert!(state.stack.is_empty());
+        assert!(state.pending_trigger.is_none());
+        assert!(matches!(state.waiting_for, WaitingFor::Priority { .. }));
     }
 
     #[test]
