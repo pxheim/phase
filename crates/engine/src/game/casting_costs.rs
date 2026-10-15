@@ -3860,6 +3860,39 @@ pub(crate) fn handle_sacrifice_for_cost(
     // block after `finish_pending_cost_or_cast`).
     let cost_event_start = events.len();
 
+    // CR 601.2h + CR 602.2b: an activation's costs are paid in any order. A
+    // permanent may be sacrificed to its own ability that also costs {T} (Fain,
+    // the Broker's "{T}, Sacrifice a creature"; Scavenger Grounds' "{T},
+    // Sacrifice a Desert"), so pay that {T} before the sacrifice: the cost still
+    // owed is paid after it, and can't tap a source that has left.
+    if pending.activation_ability_index.is_some() && chosen.contains(&pending.object_id) {
+        let is_tap = |cost: &AbilityCost| matches!(cost, AbilityCost::Tap);
+        if let Some(cost) = pending
+            .activation_cost
+            .take_if(|cost| first_activation_cost_component_matching(cost, is_tap).is_some())
+        {
+            match super::casting::pay_ability_cost_for_activation(
+                state,
+                player,
+                pending.object_id,
+                &AbilityCost::Tap,
+                pending.activation_ability_index,
+                events,
+            )? {
+                super::casting::PaymentOutcome::Paid => {}
+                super::casting::PaymentOutcome::Paused { .. } => {
+                    return Err(EngineError::InvalidAction(
+                        "a source's own {T} paused before its sacrifice".to_string(),
+                    ));
+                }
+                super::casting::PaymentOutcome::Failed { reason } => {
+                    return Err(EngineError::ActionNotAllowed(reason.reason));
+                }
+            }
+            pending.activation_cost = remove_first_activation_cost_matching(cost, is_tap);
+        }
+    }
+
     // CR 601.2h + CR 616.1: A selected cost sacrifice can pause at any
     // selected object. Keep the complete selection and event span on the
     // typed root; resumption starts after the object resolved by the chooser.
