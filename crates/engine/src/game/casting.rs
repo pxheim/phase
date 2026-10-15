@@ -1589,6 +1589,10 @@ fn graveyard_spell_objects_available_to_cast(
                     && super::keywords::effective_mayhem_cost(state, obj_id).is_some()))
         {
             keyword_objects.push(obj_id);
+        } else if has_unshown_aftermath_half(obj) {
+            // CR 702.127a: the aftermath half, cast from here while the card
+            // shows its first half.
+            keyword_objects.push(obj_id);
         }
 
         // CR 601.2a + CR 604.3: Cards in graveyard castable via static
@@ -1709,6 +1713,21 @@ fn retrace_has_discardable_land(state: &GameState, player: PlayerId, object_id: 
 /// CR 702.127: Check if an object has the Aftermath keyword.
 fn has_aftermath_keyword(state: &GameState, object_id: ObjectId) -> bool {
     super::keywords::object_has_effective_keyword_kind(state, object_id, KeywordKind::Aftermath)
+}
+
+/// CR 702.127a + CR 709.3: A split card showing its first half whose second
+/// half has Aftermath (Commit // Memory). The second half is cast only from a
+/// graveyard, so `has_aftermath_keyword`, which reads the half shown, never
+/// sees it there; and from any other zone the first half is the only one.
+fn has_unshown_aftermath_half(obj: &crate::game::game_object::GameObject) -> bool {
+    !obj.modal_back_face
+        && obj.back_face.as_ref().is_some_and(|back| {
+            back.layout_kind == Some(LayoutKind::Split)
+                && back
+                    .keywords
+                    .iter()
+                    .any(|keyword| matches!(keyword, Keyword::Aftermath))
+        })
 }
 
 /// CR 702.133: Check if an object has the Jump-start keyword.
@@ -12401,6 +12420,11 @@ fn split_spell_face_choice_available(obj: &crate::game::game_object::GameObject)
     {
         return false;
     }
+    // CR 702.127a: outside a graveyard an aftermath half can't be cast, so the
+    // first half is no choice.
+    if obj.zone != Zone::Graveyard && has_unshown_aftermath_half(obj) {
+        return false;
+    }
     is_castable_split_face(&obj.card_types) && is_castable_split_face(&back.card_types)
 }
 
@@ -15697,6 +15721,21 @@ pub fn handle_cast_spell_with_payment_mode(
     // parent stack object remains parked in the active resolution carrier.
     // The parent, not casting, owns that carrier and settles it only after the
     // instructed cast window and every continuation have completed.
+
+    // CR 702.127a + CR 709.3: from a graveyard, a split card whose first half
+    // can't be cast from there is cast as its aftermath half. One legal half is
+    // no face choice: show it before preparation, as the resolution path commits
+    // a sole legal face. A failed action restores the whole state, and a
+    // cancelled cast or the spell leaving the stack shows the first half again
+    // (`modal_back_face`).
+    if state.objects.get(&object_id).is_some_and(|obj| {
+        obj.zone == Zone::Graveyard && !obj.cast_face_committed && has_unshown_aftermath_half(obj)
+    }) && prepare_spell_cast(state, player, object_id).is_err()
+    {
+        if let Some(obj) = state.objects.get_mut(&object_id) {
+            simulate_chosen_split_spell_back_face(obj);
+        }
+    }
 
     // CR 715.3 / CR 720.3: Adventure-family cards from hand (or a commander cast
     // from the command zone) require choosing the normal creature face or
