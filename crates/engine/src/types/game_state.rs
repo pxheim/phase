@@ -24904,6 +24904,12 @@ impl GameState {
                         player.player_counters.insert(*kind, count);
                     }
                 }
+                // CR 613.1 + CR 122.1: a continuous effect can count a player's
+                // counters (Kalemne, Disciple of Iroas: "+1/+1 for each experience
+                // counter you have"), so a cached board is stale once one moves.
+                // Left Clean, Kalemne stayed 3/3 with an experience counter until
+                // something else forced a full pass.
+                self.layers_dirty.mark_full();
             }
             ResolvedPlayerEdit::Speed { old, new } => {
                 if player.speed != *old {
