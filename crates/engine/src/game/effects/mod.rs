@@ -5621,10 +5621,22 @@ fn effect_manages_own_outcome_flag(effect: &Effect) -> bool {
 ///      only when every gate below belongs to THIS instruction (Volatile
 ///      Stormdrake's two-level "If you do ... then ..." is the pinned case).
 fn resolver_performed_outcome(
+    state: &GameState,
     ability: &ResolvedAbility,
     effect_events: &[GameEvent],
 ) -> Option<bool> {
     match &ability.effect {
+        // CR 603.12 + CR 608.2c: "you may return a land you control to its
+        // owner's hand. When you do, …" (Sutina, Speaker of the Tajuru;
+        // Pyroclastic Hellion) or "If you do, …" (Geothermal Kami). Accepting
+        // the "may" latched the flag before the bounce looked for a permanent,
+        // so with none to return the reflexive tail fired anyway. A bounce
+        // that settled without a prompt and moved nothing wasn't done. One
+        // that parked a choice publishes no verdict here, per contract 2: the
+        // choice's own resume carries the outcome.
+        Effect::Bounce { .. } if matches!(state.waiting_for, WaitingFor::Priority { .. }) => Some(
+            mandatory_parent_effect_performed(&ability.effect, effect_events),
+        ),
         // CR 608.2c: derives success from its exact one-hop operation result.
         // A count/cause mismatch is a resolved no-op and keeps `WhenYouDo` /
         // `IfYouDo` descendants false. (Moved verbatim from the inline block
@@ -16024,15 +16036,16 @@ fn resolve_chain_body(
     //     `apply_parent_chain_context`, which re-clones the parent's whole
     //     context onto each child at every hand-off.
     let performed_outcome_owned;
-    let ability =
-        if let Some(performed) = resolver_performed_outcome(ability, &events[events_before..]) {
-            let mut owned = ability.clone();
-            owned.set_optional_effect_performed_recursive(performed);
-            performed_outcome_owned = owned;
-            &performed_outcome_owned
-        } else {
-            ability
-        };
+    let ability = if let Some(performed) =
+        resolver_performed_outcome(state, ability, &events[events_before..])
+    {
+        let mut owned = ability.clone();
+        owned.set_optional_effect_performed_recursive(performed);
+        performed_outcome_owned = owned;
+        &performed_outcome_owned
+    } else {
+        ability
+    };
 
     // CR 603.7: Record the objects affected by this effect as a tracked set so
     // downstream sub-abilities can resolve "this way" references (pronouns,
@@ -38585,7 +38598,7 @@ mod tests {
             subject: None,
         }];
         let mut failed = build();
-        let verdict = resolver_performed_outcome(&failed, &no_op)
+        let verdict = resolver_performed_outcome(&state, &failed, &no_op)
             .expect("ExchangeControl is enrolled in the resolver-verdict authority");
         assert!(
             !verdict,
@@ -38607,7 +38620,7 @@ mod tests {
             new_controller: PlayerId(0),
         }];
         let mut performed = build();
-        let verdict = resolver_performed_outcome(&performed, &success)
+        let verdict = resolver_performed_outcome(&state, &performed, &success)
             .expect("ExchangeControl is enrolled in the resolver-verdict authority");
         assert!(verdict, "an exchange that moved control IS performed");
         performed.set_optional_effect_performed_recursive(verdict);
@@ -38622,7 +38635,10 @@ mod tests {
             count: QuantityExpr::Fixed { value: 1 },
             target: TargetFilter::Controller,
         };
-        assert_eq!(resolver_performed_outcome(&unenrolled, &no_op), None);
+        assert_eq!(
+            resolver_performed_outcome(&state, &unenrolled, &no_op),
+            None
+        );
     }
 
     /// CR 702.131b + CR 702.131d (#2873): Ocelot Pride's race. The parent

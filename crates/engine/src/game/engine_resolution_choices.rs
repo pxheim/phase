@@ -6980,6 +6980,17 @@ pub(super) fn handle_resolution_choice(
                 })
                 .collect();
 
+            // CR 608.2c: an "up to" move that took a card is the "you may put"
+            // of its Oracle text done, so a "If you don't" tail (Ainok
+            // Wayfarer's "If you don't, put a +1/+1 counter") reads it as
+            // done. Mirrors the dig keep's `!kept.is_empty()`; an empty pick
+            // returned above with the flag as the parent left it.
+            if up_to && matches!(effect_kind, EffectKind::ChangeZone) {
+                if let Some(frame) = state.active_ability_continuation_frame_mut() {
+                    frame.pending.chain.context.optional_effect_performed = true;
+                }
+            }
+
             // Step B: resolve the reflexive `WhenYouDo` continuation (Grist's
             // `[-2]`). `waiting_for` is still `Priority` here, so
             // `resume_with_error_propagation`'s guard passes and
