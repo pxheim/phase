@@ -346,6 +346,20 @@ pub fn resolve_all(
     // Collect matching object IDs that are on the battlefield and not indestructible.
     // CR 107.3a + CR 601.2b: ability-context filter evaluation.
     let ctx = crate::game::filter::FilterContext::from_ability(ability);
+    // CR 603.6a + CR 608.2c: "destroy all other creatures that share a color with it"
+    // (Spreading Plague) spares the creature whose entering fired the trigger, the
+    // referent of OtherThanTriggerObject.
+    let ctx = match &state.current_trigger_event {
+        Some(GameEvent::ZoneChanged {
+            object_id, record, ..
+        }) => ctx.with_triggering_object(
+            crate::types::identifiers::TriggeringObjectRef::from_zone_change(
+                *object_id,
+                record.entered_incarnation,
+            ),
+        ),
+        _ => ctx,
+    };
     let matching: Vec<_> = state
         .battlefield
         .iter()
