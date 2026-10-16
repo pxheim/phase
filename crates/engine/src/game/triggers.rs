@@ -11334,6 +11334,25 @@ fn expand_multi_fire_damage_occurrences(
     let Some(source_context) = source_context else {
         return vec![(matched_index, matched_event.clone())];
     };
+    // CR 603.2c + CR 508.1m: one declaration of attackers is an occurrence per
+    // attacking creature, so Indulge's "Whenever a creature you control attacks this
+    // turn" fires once for each, as a printed Attacks trigger does.
+    if matches!(trigger.mode, TriggerMode::Attacks)
+        && matches!(matched_event, GameEvent::AttackersDeclared { .. })
+    {
+        let per_attacker = super::trigger_matchers::matching_attack_events(
+            matched_event,
+            trigger,
+            source_context,
+            state,
+        );
+        if !per_attacker.is_empty() {
+            return per_attacker
+                .into_iter()
+                .map(|event| (matched_index, event))
+                .collect();
+        }
+    }
     // CR 603.2c: a single trigger event (the combat-damage step) can contain
     // multiple occurrences. Expand EVERY matching aggregate
     // `CombatDamageDealtToPlayer` in the batch — one per defending player — into
