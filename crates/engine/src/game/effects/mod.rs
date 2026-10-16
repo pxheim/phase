@@ -17869,12 +17869,17 @@ fn fails_shared_quality(state: &GameState, effective: &ResolvedAbility) -> bool 
 /// owns an independent object slot.
 fn inherited_parent_targets(parent: &ResolvedAbility, sub: &ResolvedAbility) -> Vec<TargetRef> {
     let has_independent_target_slot = sub_has_independent_object_target_slot(sub);
+    // CR 701.23a + CR 608.2c: a search binds what it found to the move after it
+    // itself, so an object a search holds came from an earlier instruction (Basri's
+    // Aegis's countered creatures). A search that found nothing hands on no object,
+    // and "put it into your hand" moves nothing.
+    let parent_is_search = matches!(parent.effect, Effect::SearchLibrary { .. });
     parent
         .targets
         .iter()
         .filter(|target_ref| match target_ref {
             TargetRef::Player(_) => true,
-            TargetRef::Object(_) => !has_independent_target_slot,
+            TargetRef::Object(_) => !has_independent_target_slot && !parent_is_search,
         })
         .cloned()
         .collect()
