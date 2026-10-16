@@ -7877,6 +7877,17 @@ where
                     _ => None,
                 })
             })
+            .or_else(|| {
+                // CR 608.2h: with no other referent, an activated ability's "its" is
+                // its source, read as it last was on the battlefield when it was
+                // sacrificed to pay for it (Syr Ginger, the Meal Ender's "Sacrifice
+                // Syr Ginger: You gain life equal to its power").
+                ability
+                    .filter(|a| a.trigger_source.is_none())
+                    .and_then(|a| {
+                        read_object_pt_by_id(state, a.source_id, &obj_extract, &lki_extract)
+                    })
+            })
             .unwrap_or(0),
         // CR 608.2c: MV-only class today ({Parker Luck, Keen Duelist} reference
         // only the OTHER revealed card's mana value). No card reads its power or
