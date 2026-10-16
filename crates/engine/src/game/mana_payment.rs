@@ -1147,7 +1147,8 @@ fn pay_cost_with_demand_and_choices_once(
             // mana-vs-life decision sees the pool remaining after every strict
             // requirement is met. K'rrik promotion is applied per shard so the
             // life-as-payment arms handle the ShardChoice uniformly.
-            for idx in phyrexian_deferred_order(shards, life_colors) {
+            let order = phyrexian_deferred_order(shards, life_colors);
+            for (pos, &idx) in order.iter().enumerate() {
                 match effective_shard_requirement(shard_to_mana_type(shards[idx]), life_colors) {
                     ShardRequirement::Single(mt) => {
                         // CR 609.4b: When any_color, any mana can pay colored costs.
@@ -1174,14 +1175,23 @@ fn pay_cost_with_demand_and_choices_once(
                         } else {
                             let remaining_pair_shards =
                                 count_remaining_hybrid_shards(shards, idx, a, b);
-                            let color = select_hybrid_payment_color(
+                            let color = hybrid_color_a_later_shard_spares(
                                 pool,
-                                a,
-                                b,
-                                hand_demand,
-                                remaining_pair_shards,
-                                &mut preferred_hybrid_colors,
-                            );
+                                shards,
+                                &order[pos + 1..],
+                                (a, b),
+                                life_colors,
+                            )
+                            .unwrap_or_else(|| {
+                                select_hybrid_payment_color(
+                                    pool,
+                                    a,
+                                    b,
+                                    hand_demand,
+                                    remaining_pair_shards,
+                                    &mut preferred_hybrid_colors,
+                                )
+                            });
                             let unit = spend_eligible(pool, color, spell, pins)
                                 .ok_or(PaymentError::InsufficientMana)?;
                             spent.push(unit);
@@ -1532,7 +1542,8 @@ pub fn compute_phyrexian_shards(
     // mana from `sim`), then the deferred Phyrexian shards — so each shard's
     // `ShardOptions` reflects the pool after every strict requirement is met
     // (see `phyrexian_deferred_order`). K'rrik promotion is applied per shard.
-    for idx in phyrexian_deferred_order(shards, life_colors) {
+    let order = phyrexian_deferred_order(shards, life_colors);
+    for (pos, &idx) in order.iter().enumerate() {
         match effective_shard_requirement(shard_to_mana_type(shards[idx]), life_colors) {
             ShardRequirement::Single(mt) => {
                 if mana_spend_permission.is_some_and(|permission| permission.allows_payment_as(mt))
@@ -1547,14 +1558,23 @@ pub fn compute_phyrexian_shards(
                     let _ = spend_any_for_required_colors(&mut sim, &[a, b], spell, None, &[]);
                 } else {
                     let remaining_pair_shards = count_remaining_hybrid_shards(shards, idx, a, b);
-                    let color = select_hybrid_payment_color(
+                    let color = hybrid_color_a_later_shard_spares(
                         &sim,
-                        a,
-                        b,
-                        None,
-                        remaining_pair_shards,
-                        &mut preferred_hybrid_colors,
-                    );
+                        shards,
+                        &order[pos + 1..],
+                        (a, b),
+                        life_colors,
+                    )
+                    .unwrap_or_else(|| {
+                        select_hybrid_payment_color(
+                            &sim,
+                            a,
+                            b,
+                            None,
+                            remaining_pair_shards,
+                            &mut preferred_hybrid_colors,
+                        )
+                    });
                     let _ = spend_eligible(&mut sim, color, spell, &[]);
                 }
             }
@@ -1775,6 +1795,47 @@ fn canonical_hybrid_key(a: ManaType, b: ManaType) -> (ManaType, ManaType) {
         (a, b)
     } else {
         (b, a)
+    }
+}
+
+/// CR 107.4e + CR 118.3: The half of a hybrid shard to pay when only one of
+/// them leaves the pool enough for the shards still to be paid after it.
+/// Rigo, Streetwise Mentor's `{G/W}{W}{W/U}` from two Plains and a Forest must
+/// pay its `{G/W}` with the Forest, though white is the more plentiful: the
+/// `{W}` and the `{W/U}` after it need both Plains. Counts a later shard that
+/// can take this color — a strict one, or a hybrid of another pair — as
+/// needing it. `None` when both halves leave enough, or neither does, so the
+/// usual choice decides.
+fn hybrid_color_a_later_shard_spares(
+    pool: &ManaPool,
+    shards: &[ManaCostShard],
+    later: &[usize],
+    (a, b): (ManaType, ManaType),
+    life_colors: crate::types::mana::LifePaymentColors,
+) -> Option<ManaType> {
+    let pair = canonical_hybrid_key(a, b);
+    let later_need = |color: ManaType| {
+        later
+            .iter()
+            .filter(|&&i| {
+                match effective_shard_requirement(shard_to_mana_type(shards[i]), life_colors) {
+                    ShardRequirement::Single(mt) => mt == color,
+                    ShardRequirement::Hybrid(x, y) => {
+                        (x == color || y == color) && canonical_hybrid_key(x, y) != pair
+                    }
+                    _ => false,
+                }
+            })
+            .count()
+    };
+    let spares = |color: ManaType| {
+        let have = pool.count_color(color);
+        have > 0 && have > later_need(color)
+    };
+    match (spares(a), spares(b)) {
+        (true, false) => Some(a),
+        (false, true) => Some(b),
+        _ => None,
     }
 }
 
