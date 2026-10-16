@@ -8813,6 +8813,14 @@ fn pay_additional_cost_with_source(
                 pending.object_id,
                 filter.as_ref(),
             );
+            // CR 107.3a + CR 601.2b: "return X Swamps you control" (Infernal
+            // Harvest) carries X as the u32::MAX sentinel, as a sacrifice of X
+            // does, and returns exactly the X announced.
+            let count = if count == u32::MAX {
+                pending.ability.chosen_x.unwrap_or(0)
+            } else {
+                count
+            };
             if eligible.len() < count as usize {
                 return Err(EngineError::ActionNotAllowed(
                     "Not enough eligible permanents to return".into(),
@@ -9471,15 +9479,80 @@ fn additional_cost_x_max(
                 },
             )
         }
+        // CR 107.3a + CR 601.2b + CR 701.67a: "waterbend {X}" as an additional
+        // cost (Crashing Wave) announces X before its "up to X" targets. The
+        // spell's payment caps it again once the whole cost is known.
+        AbilityCost::Waterbend { cost: mana } if cost_has_x(mana) => {
+            Some(max_x_value(state, player, mana, Some(source_id)))
+        }
+        AbilityCost::ReturnToHand {
+            count: u32::MAX,
+            filter,
+            from_zone: None | Some(Zone::Battlefield),
+        } => {
+            // CR 601.2b: X in an additional return-to-hand cost is announced
+            // before later target choices (Infernal Harvest).
+            Some(
+                super::casting::find_eligible_return_to_hand_targets(
+                    state,
+                    player,
+                    source_id,
+                    filter.as_ref(),
+                )
+                .len()
+                .try_into()
+                .unwrap_or(u32::MAX),
+            )
+        }
+        AbilityCost::TapCreatures { filter, .. } if is_tap_x_creatures_cost(cost) => {
+            Some(tap_x_creatures_max(state, player, source_id, cost, filter))
+        }
+        // CR 601.2b: a sibling {T} keeps the source out of "Tap X untapped …"
+        // (Aryel, Knight of Windgrace can't tap itself twice), so the tap cost
+        // is counted against the whole cost.
         AbilityCost::Composite { costs } => costs
             .iter()
-            .filter_map(|cost| additional_cost_x_max(state, player, source_id, cost))
+            .filter_map(|sub| match sub {
+                AbilityCost::TapCreatures { filter, .. } if is_tap_x_creatures_cost(sub) => {
+                    Some(tap_x_creatures_max(state, player, source_id, cost, filter))
+                }
+                _ => additional_cost_x_max(state, player, source_id, sub),
+            })
             .min(),
         AbilityCost::PerCounter { base, .. } => {
             additional_cost_x_max(state, player, source_id, base)
         }
         _ => None,
     }
+}
+
+/// CR 107.3a: "Tap X untapped [type] you control" carries X as the u32::MAX
+/// count sentinel, as a sacrifice of X does.
+fn is_tap_x_creatures_cost(cost: &AbilityCost) -> bool {
+    matches!(
+        cost,
+        AbilityCost::TapCreatures {
+            requirement: crate::types::ability::TapCreaturesRequirement::Count { count: u32::MAX },
+            ..
+        }
+    )
+}
+
+/// CR 601.2b: the most a "Tap X untapped …" cost can tap, announced before
+/// later target choices.
+fn tap_x_creatures_max(
+    state: &GameState,
+    player: PlayerId,
+    source_id: ObjectId,
+    whole_cost: &AbilityCost,
+    filter: &TargetFilter,
+) -> u32 {
+    super::casting::find_eligible_tap_creatures_for_cost(
+        state, player, source_id, whole_cost, filter,
+    )
+    .len()
+    .try_into()
+    .unwrap_or(u32::MAX)
 }
 
 fn activation_counter_cost_x_max(
@@ -9518,6 +9591,9 @@ fn cost_needs_activation_x_announcement(cost: &AbilityCost) -> bool {
             filter: Some(filter),
             ..
         } => super::cost_payability::target_filter_has_x_mana_value_constraint(filter),
+        // CR 107.3a + CR 601.2b: "Tap X untapped Knights you control" (Aryel,
+        // Knight of Windgrace) announces X before a target filter reads it.
+        AbilityCost::TapCreatures { .. } => is_tap_x_creatures_cost(cost),
         AbilityCost::Composite { costs } => costs.iter().any(cost_needs_activation_x_announcement),
         _ => false,
     }
