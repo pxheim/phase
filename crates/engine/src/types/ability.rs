@@ -21745,7 +21745,6 @@ impl Effect {
             | Effect::AdditionalPhase { target, .. }
             | Effect::Double { target, .. }
             | Effect::SetLifeTotal { target, .. }
-            | Effect::GiveControl { target, .. }
             | Effect::RemoveFromCombat { target, .. }
             | Effect::BecomeBlocked { target, .. }
             | Effect::PutSticker { target, .. }
@@ -22089,6 +22088,11 @@ impl Effect {
             // CR 701.12a: player targets (player_a/player_b) are surfaced as
             // dual target slots by ability_utils, not by `target_filter()`.
             | Effect::ExchangeLifeTotals { .. }
+            // CR 110.2 + CR 115.1: the permanent and the recipient ("target
+            // opponent gains control of target permanent you control") are
+            // surfaced as dual target slots by ability_utils, not by
+            // `target_filter()`.
+            | Effect::GiveControl { .. }
             // CR 601.2a: candidates gathered by `filter`/`zones` at resolution,
             // no player-selectable target slot.
             | Effect::FreeCastFromZones { .. }

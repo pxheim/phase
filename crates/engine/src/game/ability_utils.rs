@@ -9441,9 +9441,10 @@ fn validate_target_constraints(
 /// every seam that reasons about "does this node claim a target slot", "how
 /// many", or "which filter governs slot i" must ask THIS function instead.
 ///
-/// CR 701.12a: both members are exchanges, and an exchange names two subjects.
-/// `ExchangeControl` names two permanents (or a permanent and a stack spell,
-/// CR 400.7a); `ExchangeLifeTotals` names two players (CR 701.12c).
+/// CR 701.12a: an exchange names two subjects. `ExchangeControl` names two
+/// permanents (or a permanent and a stack spell, CR 400.7a);
+/// `ExchangeLifeTotals` names two players (CR 701.12c). CR 110.2: a
+/// `GiveControl` names a permanent and the player who gains control of it.
 ///
 /// SINGLE AUTHORITY. Consulted by `collect_target_slots_inner`,
 /// `collect_target_slot_specs`, `chain_has_target_sink`,
@@ -9464,6 +9465,14 @@ fn paired_subject_filters(effect: &Effect) -> Option<[&TargetFilter; 2]> {
     match effect {
         Effect::ExchangeControl { target_a, target_b } => Some([target_a, target_b]),
         Effect::ExchangeLifeTotals { player_a, player_b } => Some([player_a, player_b]),
+        // CR 110.2 + CR 115.1: "Target opponent gains control of target
+        // permanent you control" (Zedruu the Greathearted, Donate) names a
+        // permanent and a recipient. The recipient's own slot is what picks one
+        // opponent of several; without it `resolve_give` finds the recipient
+        // ambiguous and gives nothing. The permanent is declared first so its
+        // "you control" isn't re-bound to the recipient (CR 109.4's
+        // `relative_controller_kind` reads a prior player slot as "you").
+        Effect::GiveControl { target, recipient } => Some([target, recipient]),
         _ => None,
     }
 }
