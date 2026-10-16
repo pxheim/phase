@@ -6288,7 +6288,9 @@ fn validate_x_mana_sacrifice_residual(
         // non-self Count sacrifices is payable through this continuation.
         // Inspect every node before the first selection or cost move.
         cost.for_each_cost_node(&mut |node| match node {
-            AbilityCost::Composite { .. } => {}
+            // CR 602.2b: a {T} beside the sacrifice (Fiend Artisan's "{X}{B/G}, {T},
+            // Sacrifice another creature") is paid with the rest once it's chosen.
+            AbilityCost::Composite { .. } | AbilityCost::Tap => {}
             AbilityCost::Sacrifice(sacrifice)
                 if !matches!(sacrifice.target, TargetFilter::SelfRef) =>
             {
@@ -6302,7 +6304,6 @@ fn validate_x_mana_sacrifice_residual(
             AbilityCost::Sacrifice(_)
             | AbilityCost::Mana { .. }
             | AbilityCost::ManaDynamic { .. }
-            | AbilityCost::Tap
             | AbilityCost::Untap
             | AbilityCost::Loyalty { .. }
             | AbilityCost::PayLife { .. }
@@ -26508,7 +26509,6 @@ its replicate cost was paid.)\nDraw a card.";
                     quantity: QuantityExpr::Fixed { value: 1 },
                 },
             ),
-            ("tap", AbilityCost::Tap),
             ("untap", AbilityCost::Untap),
             ("loyalty", AbilityCost::Loyalty { amount: -1 }),
             (
