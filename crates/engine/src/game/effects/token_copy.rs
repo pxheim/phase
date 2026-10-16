@@ -5,7 +5,7 @@ use crate::game::layers::has_active_copy_layer_effects;
 use crate::game::layers::{compute_current_copiable_values, remove_subtype_set};
 #[cfg(test)]
 use crate::game::printed_cards::intrinsic_copiable_values;
-use crate::game::quantity::resolve_quantity;
+use crate::game::quantity::{resolve_quantity, resolve_quantity_with_targets};
 use crate::game::{targeting, zones};
 use crate::types::ability::{
     ContinuousModification, Effect, EffectError, EffectKind, ResolvedAbility, StaticDefinition,
@@ -77,7 +77,9 @@ pub fn resolve(
         ),
         _ => return Err(EffectError::MissingParam("CopyTokenOf".to_string())),
     };
-    let count = resolve_quantity(state, &count_expr, ability.controller, ability.source_id).max(0);
+    // CR 107.3a: "create X tokens that are copies" counts the X the spell was cast
+    // with, which the resolving ability holds, as Effect::Token's count reads it.
+    let count = resolve_quantity_with_targets(state, &count_expr, ability).max(0);
 
     // CR 109.4 + CR 111.2: The token's creator (and therefore controller) is
     // determined by the `owner` filter. Resolved once, before the creation
