@@ -542,10 +542,45 @@ pub(crate) fn build_target_slots_for_announcement(
 ) -> Result<TargetSlotBuildOutcome, EngineError> {
     let mut acc = SlotAccumulator::default();
     match collect_target_slots(state, ability, &mut acc) {
+        Ok(()) if unslotted_target_is_missing(state, ability) => {
+            Err(no_legal_target_slots().into())
+        }
         Ok(()) => Ok(TargetSlotBuildOutcome::Slots(acc.slots)),
         Err(TargetSlotBuildError::RequiresChosenX) => Ok(TargetSlotBuildOutcome::RequiresChosenX),
         Err(TargetSlotBuildError::Engine(error)) => Err(error),
     }
+}
+
+/// CR 601.2c + CR 602.2b: Whether the head of a spell or ability names a target
+/// that claims no slot, as it's read from context while resolving, with nothing
+/// there for it: "target creature card exiled with ~" (`ExiledBySource`, The
+/// Darkness Crystal) or "target face-down creature" (`TurnFaceUp`, Ixidor).
+/// Announcing it still needs a legal target, so with none it can't be cast or
+/// activated. Only the head: a later step's "exiled with ~" can name what an
+/// earlier step exiles as it resolves. "A card exiled with ~" is chosen as it
+/// resolves (`TargetChoiceTiming::Resolution`), and a bare `ExiledBySource` is
+/// "the exiled card" or all of them, so neither is held.
+fn unslotted_target_is_missing(state: &GameState, ability: &ResolvedAbility) -> bool {
+    if ability.target_choice_timing != TargetChoiceTiming::Stack
+        || ability.optional_targeting
+        || ability.multi_target.is_some()
+    {
+        return false;
+    }
+    let filter = match &ability.effect {
+        Effect::TurnFaceUp { target } if !target.is_context_ref() => target,
+        effect => match effect.target_filter() {
+            Some(filter @ TargetFilter::And { .. }) if filter.references_exiled_by_source() => {
+                filter
+            }
+            _ => return false,
+        },
+    };
+    let ctx = crate::game::filter::FilterContext::from_ability(ability);
+    !state
+        .objects
+        .keys()
+        .any(|&id| crate::game::filter::matches_target_filter(state, id, filter, &ctx))
 }
 
 /// CR 601.2c / CR 602.2b: Collect all target slots for an ability chain. Each targeting
@@ -726,6 +761,9 @@ pub fn build_target_slots_labelled(
         }
         acc.current_label = mode_descriptions.get(idx).cloned();
         collect_target_slots(state, &resolved, &mut acc)?;
+        if unslotted_target_is_missing(state, &resolved) {
+            return Err(no_legal_target_slots().into());
+        }
         acc.current_label = None;
     }
 
