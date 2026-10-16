@@ -4859,7 +4859,7 @@ fn prepare_deterministic_exile_cost_selection(
 /// for an `AbilityCost::Sacrifice(SacrificeCost::count(!SelfRef, 1))` mana ability cost.
 /// Delegates eligibility to the casting cost helper so mana and non-mana
 /// activation costs share the same battlefield/controller/filter semantics.
-fn sacrifice_cost_choice(
+pub(crate) fn sacrifice_cost_choice(
     state: &GameState,
     player: PlayerId,
     source_id: ObjectId,

@@ -15,9 +15,10 @@
 
 use crate::types::ability::ManaSpendRestriction;
 use crate::types::ability::{
-    AbilityCost, AbilityDefinition, AbilityKind, ActivationRestriction, ControllerRef, Effect,
-    ManaProduction, PlayerFilter, QuantityExpr, ResolvedAbility, SacrificeCost,
-    SacrificeRequirement, TargetFilter, TriggerDefinition, TriggerDefinitionRef, TypedFilter,
+    AbilityCost, AbilityDefinition, AbilityKind, ActivationRestriction, ControllerRef,
+    CostPaidObjectSnapshot, Effect, ManaProduction, PlayerFilter, QuantityExpr, ResolvedAbility,
+    SacrificeCost, SacrificeRequirement, TargetFilter, TriggerDefinition, TriggerDefinitionRef,
+    TypedFilter,
 };
 use crate::types::actions::GameAction;
 use crate::types::card_type::CoreType;
@@ -1176,6 +1177,49 @@ pub(crate) fn cost_conclusively_payable_by_cheap_gate(cost: &Option<AbilityCost>
 }
 
 /// CR 701.21: True when paying this ability's cost sacrifices a permanent
+/// other than its source, which the player chooses.
+fn cost_sacrifices_another(cost: &Option<AbilityCost>) -> bool {
+    cost_has_component(
+        cost,
+        |c| matches!(c, AbilityCost::Sacrifice(s) if s.target != TargetFilter::SelfRef),
+    )
+}
+
+/// CR 117.1d + CR 608.2k: `resolved` with the permanent its cost could
+/// sacrifice that makes the most mana bound as its cost-paid object, for a
+/// feasibility scan run before any is chosen. Soldevi Adnate's "Add an amount
+/// of {B} equal to the sacrificed creature's mana value" counts 0 unbound,
+/// though the player picks the sacrifice as they pay. Unchanged for a cost that
+/// sacrifices nothing else, or with nothing to sacrifice.
+fn bound_to_best_sacrifice(
+    state: &GameState,
+    object_id: ObjectId,
+    controller: PlayerId,
+    ability: &AbilityDefinition,
+    produced: &ManaProduction,
+    resolved: ResolvedAbility,
+) -> ResolvedAbility {
+    let Some((_, candidates)) =
+        mana_abilities::sacrifice_cost_choice(state, controller, object_id, &ability.cost)
+    else {
+        return resolved;
+    };
+    candidates
+        .iter()
+        .filter_map(|id| state.objects.get(id))
+        .map(|obj| {
+            let mut bound = resolved.clone();
+            bound.set_cost_paid_object_recursive(CostPaidObjectSnapshot::capture(
+                obj,
+                obj.snapshot_for_mana_spent(),
+            ));
+            bound
+        })
+        .max_by_key(|bound| resolved_production_count(produced, state, bound))
+        .unwrap_or(resolved)
+}
+
+/// CR 701.21: True when paying this ability's cost sacrifices a permanent
 /// (the source itself or another). Matches a bare `Sacrifice` cost and a
 /// `Sacrifice` nested inside a `Composite`, for any target filter.
 fn cost_includes_sacrifice(cost: &Option<AbilityCost>) -> bool {
@@ -2072,9 +2116,12 @@ pub(crate) fn feasible_mana_capacity(
             // applied (`max_mana_yield`).
             let resolved =
                 resolved_mana_ability_for_live_output(state, object_id, controller, ability);
-            let Effect::Mana { produced, .. } = &resolved.effect else {
+            let Effect::Mana { produced, .. } = resolved.effect.clone() else {
                 return None;
             };
+            let produced = &produced;
+            let resolved =
+                bound_to_best_sacrifice(state, object_id, controller, ability, produced, resolved);
             let gross =
                 super::effects::mana::resolve_mana_types_for_ability(produced, state, &resolved)
                     .len() as u32;
@@ -2134,7 +2181,10 @@ pub(crate) fn has_activatable_non_tap_mana_ability_for_payment(
             // need no player choice, so `is_active_tap_mana_ability` already
             // covers them on the auto-tap path — only ambiguous non-tap costs
             // (KCI's "Sacrifice an artifact", discard, pay-life) belong here.
-            if has_tap_component(&ability.cost)
+            // CR 117.1d + CR 601.2g: a `{T}` beside a sacrifice of another
+            // permanent (Soldevi Adnate's "{T}, Sacrifice a black or artifact
+            // creature") needs that choice too, and auto-tap can't make it.
+            if (has_tap_component(&ability.cost) && !cost_sacrifices_another(&ability.cost))
                 || has_unambiguous_self_sacrifice_component(&ability.cost)
             {
                 return false;
@@ -2324,8 +2374,14 @@ fn activatable_mana_profiles_for_object(
             ) {
                 return None;
             }
-            let resolved =
-                super::ability_utils::build_resolved_from_def(ability, object_id, controller);
+            let resolved = bound_to_best_sacrifice(
+                state,
+                object_id,
+                controller,
+                ability,
+                produced,
+                super::ability_utils::build_resolved_from_def(ability, object_id, controller),
+            );
             profile_kind_from_production(state, object_id, controller, produced, &resolved)
                 .and_then(|kind| profile_kind_allowed_for_context(kind, payment_context))
                 .map(|kind| ActivatableManaProfile { object_id, kind })
