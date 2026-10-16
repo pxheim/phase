@@ -413,6 +413,24 @@ pub fn build_chained_resolved(
     result.ok_or_else(|| EngineError::InvalidAction("No modes selected".to_string()))
 }
 
+/// CR 700.2: The selected modes after the first, taken off `ability`'s chain in order: the
+/// nodes `build_chained_resolved` stamped as mode roots. `append_to_sub_chain` puts them back.
+fn detach_later_modes(ability: &mut ResolvedAbility, modes: &mut Vec<ResolvedAbility>) {
+    let next_is_mode = ability
+        .sub_ability
+        .as_deref()
+        .is_some_and(|sub| sub.modal_instruction_ordinal.is_some());
+    if next_is_mode {
+        let mut mode = *ability.sub_ability.take().expect("checked above");
+        let mut after = Vec::new();
+        detach_later_modes(&mut mode, &mut after);
+        modes.push(mode);
+        modes.extend(after);
+    } else if let Some(sub) = ability.sub_ability.as_deref_mut() {
+        detach_later_modes(sub, modes);
+    }
+}
+
 /// Append `next` to the tail of `ability`'s sub_ability chain.
 pub(crate) fn append_to_sub_chain(ability: &mut ResolvedAbility, next: ResolvedAbility) {
     let mut node = ability;
@@ -1991,7 +2009,24 @@ pub fn assign_selected_slots_in_chain(
         return Ok(());
     }
     let mut next_slot = 0usize;
-    assign_selected_slots_recursive(state, ability, selected_slots, &mut next_slot)?;
+    // CR 700.2 + CR 601.2c: each chosen mode announces its own targets, in printed order, as
+    // `build_target_slots_labelled` collects them mode by mode. A mode whose step chooses its
+    // object at resolution (`defers_conditional_target_selection`) stops the descent through
+    // its own steps only: Witherbloom Command's "then you return a land card from your
+    // graveyard" kept modes 0 and 1's destroy from its slot.
+    let mut later_modes = Vec::new();
+    detach_later_modes(ability, &mut later_modes);
+    let mut assigned =
+        assign_selected_slots_recursive(state, ability, selected_slots, &mut next_slot);
+    for mode in &mut later_modes {
+        if assigned.is_ok() {
+            assigned = assign_selected_slots_recursive(state, mode, selected_slots, &mut next_slot);
+        }
+    }
+    for mode in later_modes {
+        append_to_sub_chain(ability, mode);
+    }
+    assigned?;
     if next_slot != selected_slots.len() {
         return Err(EngineError::InvalidAction(
             "Unused selected target slots".to_string(),
