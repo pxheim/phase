@@ -5935,8 +5935,13 @@ pub(crate) fn surface_next_unpaid_interactive_activation_cost(
         // CR 107.3a + CR 601.2b: mirror the adjacent Sacrifice arm above —
         // a "Tap X untapped [type] you control" cost uses the u32::MAX
         // sentinel for X, bounding the choice to [0, eligible.len()], not a
-        // literal exact/minimum match on u32::MAX.
-        let (min_count, max_count) = super::casting::sacrifice_cost_bounds(count, eligible.len());
+        // literal exact/minimum match on u32::MAX. An X already announced
+        // (Necron Overlord's "{X}, {T}, Tap X untapped artifacts") is that X exactly.
+        let (min_count, max_count) = super::casting::sacrifice_cost_bounds_with_chosen_x(
+            count,
+            eligible.len(),
+            pending.ability.chosen_x,
+        );
         if eligible.len() < min_count {
             return Err(EngineError::ActionNotAllowed(
                 "Not enough eligible creatures to tap".into(),
