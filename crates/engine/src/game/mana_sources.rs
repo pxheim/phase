@@ -3458,6 +3458,19 @@ pub(crate) fn taps_for_mana_aura_bonus_indexed(
             ) {
                 continue;
             }
+            // CR 603.4: plan only the bonus the resolver will add, under the same
+            // intervening condition (Regal Behemoth's monarch, Rikala's tide counters).
+            if trigger.condition.as_ref().is_some_and(|condition| {
+                !super::triggers::check_trigger_condition_with_source(
+                    state,
+                    condition,
+                    source_context.lki.controller,
+                    Some(&source_context),
+                    None,
+                )
+            }) {
+                continue;
+            }
             let Some(execute) = trigger.execute.as_deref() else {
                 continue;
             };

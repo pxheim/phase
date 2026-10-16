@@ -3678,6 +3678,23 @@ fn inline_tap_mana_trigger_abilities(
             if !matches_event {
                 continue;
             }
+            // CR 603.4: an intervening "if"/"while" (Regal Behemoth's "while you're the
+            // monarch") is checked as the mana ability triggers, as the trigger scan does.
+            if trigger_definition
+                .condition
+                .as_ref()
+                .is_some_and(|condition| {
+                    !check_trigger_condition_with_source(
+                        state,
+                        condition,
+                        source_context.lki.controller,
+                        Some(&source_context),
+                        Some(tap_event),
+                    )
+                })
+            {
+                continue;
+            }
             let mut ability = build_triggered_ability_from_context(
                 state,
                 trigger_definition,
