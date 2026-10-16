@@ -11145,17 +11145,18 @@ fn finalize_cast_with_phyrexian_choices_inner(
         ability.effect,
         crate::types::ability::Effect::Unimplemented { .. }
     ) && ability.targets.is_empty();
-    let stack_ability = if !is_placeholder {
-        Some(ability)
-    } else {
-        // CR 603.4: For permanent spells with no spell ability, store cast_from_zone
-        // directly on the object since there's no ability context to carry it.
-        if let Some(obj) = state.objects.get_mut(&object_id) {
-            obj.cast_from_zone = Some(source_zone);
-            obj.cast_controller = Some(player);
-        }
-        None
-    };
+    // CR 603.4 + CR 702.85a: Store cast_from_zone on the stack object for every
+    // spell, not only a permanent spell with no spell ability. A cast trigger's
+    // `WasCast` intervening-if is rechecked at resolution against the spell
+    // object while it is still on the stack, so an instant or sorcery with a
+    // spell ability of its own (Violent Outburst, Bituminous Blast) otherwise
+    // read no cast provenance and its Cascade did nothing. The ability context
+    // still carries the same value for resolution.
+    if let Some(obj) = state.objects.get_mut(&object_id) {
+        obj.cast_from_zone = Some(source_zone);
+        obj.cast_controller = Some(player);
+    }
+    let stack_ability = if !is_placeholder { Some(ability) } else { None };
 
     // CR 107.3m: Apply the paid-X snapshot to the object (after the placeholder
     // branch has already taken a mutable borrow). Done unconditionally so that
