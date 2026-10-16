@@ -18138,7 +18138,11 @@ fn spell_has_legal_targets_in_flushed_state(
         None => return true, // Permanent with no spell abilities needs no targets
     };
 
-    let resolved = build_resolved_from_def(&ability_def, obj.id, player);
+    let mut resolved = build_resolved_from_def(&ability_def, obj.id, player);
+    // CR 601.2b: an X the spell announces from the board ("where X is the greatest power among
+    // creatures you control as you cast this spell") is known before its targets are chosen, so
+    // its "up to X" targets are counted with it, as the cast itself counts them.
+    super::ability_utils::publish_announced_x(state, &mut resolved, player, obj.id);
     let base_ok = match build_target_slots(state, &resolved) {
         Ok(target_slots) if target_slots.is_empty() => true,
         Ok(target_slots) => has_legal_target_assignment_for_ability(

@@ -8787,9 +8787,14 @@ fn evaluate_shares_quality(
     relation: &SharedQualityRelation,
     source: &SourceContext<'_>,
 ) -> bool {
-    let shares = reference.as_ref().is_none_or(|reference_filter| {
-        object_shares_quality_with_reference_filter(state, obj, quality, reference_filter, source)
-    });
+    let Some(reference_filter) = reference.as_ref() else {
+        // CR 115.1: with no reference the quality relates the chosen targets to each other
+        // ("two target creatures that share no creature types"), which one object alone can't
+        // fail. The set is held by `targets_share_no_forbidden_quality` in `ability_utils`.
+        return true;
+    };
+    let shares =
+        object_shares_quality_with_reference_filter(state, obj, quality, reference_filter, source);
     match relation {
         SharedQualityRelation::Shares => shares,
         SharedQualityRelation::DoesNotShare => {

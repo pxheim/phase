@@ -8244,7 +8244,77 @@ fn validate_selected_slots_with_specs(
         }
     }
 
+    if !targets_share_no_forbidden_quality(state, specs, selected_slots) {
+        return Err(EngineError::InvalidAction(
+            "Targets share a quality they must not share".to_string(),
+        ));
+    }
     validate_target_constraints(Some(state), &compact_targets, constraints, Some(ability))
+}
+
+/// CR 115.1 + CR 601.2c: "two target creatures that share no creature types" (Rivals' Duel) is
+/// a `SharesQuality` with no reference and the `DoesNotShare` relation: the targets are held to
+/// each other, not one of them to a reference, so the filter passes each object alone (see
+/// `evaluate_shares_quality`) and the chosen set is held here, pair by pair.
+fn targets_share_no_forbidden_quality(
+    state: &GameState,
+    specs: &[TargetSlotSpec],
+    selected_slots: &[Option<TargetRef>],
+) -> bool {
+    fn unshared(filter: &TargetFilter, out: &mut Vec<crate::types::ability::SharedQuality>) {
+        match filter {
+            TargetFilter::Typed(tf) => {
+                for prop in &tf.properties {
+                    if let FilterProp::SharesQuality {
+                        quality,
+                        reference: None,
+                        relation: crate::types::ability::SharedQualityRelation::DoesNotShare,
+                    } = prop
+                    {
+                        out.push(quality.clone());
+                    }
+                }
+            }
+            TargetFilter::And { filters } => filters.iter().for_each(|f| unshared(f, out)),
+            _ => {}
+        }
+    }
+    let chosen: Vec<(&TargetSlotSpec, ObjectId)> = specs
+        .iter()
+        .zip(selected_slots)
+        .filter_map(|(spec, slot)| match slot {
+            Some(TargetRef::Object(id)) => Some((spec, *id)),
+            _ => None,
+        })
+        .collect();
+    for (i, (spec, a)) in chosen.iter().enumerate() {
+        let mut qualities = Vec::new();
+        unshared(&spec.filter, &mut qualities);
+        for quality in &qualities {
+            let values = |id: &ObjectId| {
+                state
+                    .objects
+                    .get(id)
+                    .map(|obj| {
+                        super::filter::object_shared_quality_values_public(
+                            obj,
+                            quality,
+                            &state.all_creature_types,
+                        )
+                    })
+                    .unwrap_or_default()
+            };
+            let mine = values(a);
+            if chosen[i + 1..]
+                .iter()
+                .filter(|(other, _)| other.instance == spec.instance)
+                .any(|(_, b)| !values(b).is_disjoint(&mine))
+            {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 fn assign_targets_recursive(
