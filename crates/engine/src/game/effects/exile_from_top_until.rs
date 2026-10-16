@@ -260,6 +260,21 @@ pub fn resolve(
                     sub_clone.context = ability.context.clone();
                     super::bind_resolution_exile_batch_paths(&mut sub_clone, &linked_batch);
                     super::resolve_ability_chain(state, &sub_clone, events, 1)?;
+                } else if !super::effect_refs_parent_target(&sub.effect)
+                    && !sub_effect_references_exiled_by_source(sub)
+                    && !matches!(
+                        sub.effect,
+                        Effect::GrantCastingPermission { .. } | Effect::CastFromZone { .. }
+                    )
+                {
+                    // CR 608.2c: with no hit, a next instruction that doesn't refer to the
+                    // card ("You may put a +1/+1 counter on Black Widow") still happens.
+                    // What follows it ("If you don't, you may cast the exiled nonland
+                    // card") has no card to address, so it is cut off.
+                    let mut head = sub.as_ref().clone();
+                    head.sub_ability = None;
+                    head.context = ability.context.clone();
+                    super::resolve_ability_chain(state, &head, events, 1)?;
                 } else if linked_batch.is_empty() {
                     // CR 607.2a: no current batch means there is no "rest" to move.
                 } else if let Some(cleanup) = first_exiled_by_source_link(sub.as_ref()) {
