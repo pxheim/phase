@@ -17368,6 +17368,17 @@ fn continue_with_prepared(
             pending_x.origin_zone = prepared.origin_zone;
             pending_x.payment_mode = prepared.payment_mode;
             pending_x.deferred_target_selection = true;
+            // CR 601.2b + CR 601.2f: the printed required additional cost is paid once X
+            // is announced and the targets chosen (Aether Tide's "discard X creature
+            // cards"). Only a target prompt re-read it from the card, so targets chosen
+            // without one skipped it.
+            if let Some(required @ AdditionalCost::Required(_)) = state
+                .objects
+                .get(&prepared.object_id)
+                .and_then(|obj| obj.additional_cost.clone())
+            {
+                pending_x.additional_cost_flow = Some(required);
+            }
             state.pending_cast = Some(Box::new(pending_x));
             return casting_costs::enter_payment_step(state, player, None, events);
         }

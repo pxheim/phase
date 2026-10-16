@@ -8652,8 +8652,11 @@ fn pay_additional_cost_with_source(
             });
         }
         AbilityCost::Discard { count, filter, .. } => {
-            let count = super::quantity::resolve_quantity(state, &count, player, pending.object_id)
-                .max(0) as usize;
+            // CR 601.2b + 601.2f: "discard X cards" counts the X announced for this cast,
+            // which only the pending ability holds while the card is still in hand.
+            let count =
+                super::quantity::resolve_quantity_with_targets(state, &count, &pending.ability)
+                    .max(0) as usize;
             // CR 601.2b: Discard requires interactive card selection — return a WaitingFor.
             let eligible = super::casting::find_eligible_discard_targets(
                 state,
