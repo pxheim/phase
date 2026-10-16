@@ -234,6 +234,9 @@ pub fn resolve_double_pt(
     // `DoublePT { target: SelfRef }` sub-abilities don't inherit parent targets.
     let ids = crate::game::effects::resolved_effect_object_ids(state, ability, target_filter);
 
+    // CR 701.10b: double the power it has now. A repeat ("double ... X times") or an
+    // earlier step of this resolution leaves the layers stale, so read them fresh.
+    crate::game::layers::flush_layers(state);
     for obj_id in ids {
         let modifications = double_modifications(state, obj_id, mode, factor)?;
         state.add_transient_continuous_effect(
@@ -272,6 +275,8 @@ pub fn resolve_double_pt_all(
 
     let dur = ability.duration.clone().unwrap_or(Duration::UntilEndOfTurn);
 
+    // CR 701.10b: as for one creature, double the power each has now.
+    crate::game::layers::flush_layers(state);
     // CR 107.3a + CR 601.2b: ability-context filter evaluation.
     let ctx = filter::FilterContext::from_ability(ability);
     let matching: Vec<ObjectId> = state
