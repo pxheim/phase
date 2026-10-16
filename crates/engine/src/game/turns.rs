@@ -359,6 +359,11 @@ pub fn end_turn_to_cleanup(state: &mut GameState, events: &mut Vec<GameEvent>) {
 /// that skip directly out of combat use the same teardown authority.
 fn complete_end_combat_teardown(state: &mut GameState) {
     state.combat = None;
+    // CR 506.4 + CR 613.1: a static can read "attacking" (Gruul War Chant:
+    // "Attacking creatures you control get +1/+0"), so a cached board is stale
+    // once combat ends. Left Clean, the attackers kept the bonus into the
+    // postcombat main phase until something else forced a full pass.
+    state.layers_dirty.mark_full();
     state.current_combat_attacker_restriction = None;
     state.current_combat_attacker_restriction_source = None;
     super::layers::prune_end_of_combat_effects(state);
